@@ -1,0 +1,10 @@
+node_modules/
+unpackage/
+.local/
+dist/
+*.keystore
+*.jks
+*.p12
+*.log
+.env*
+!.env.example

@@ -1,0 +1,58 @@
+{
+    "name" : "会议记录",
+    "appid" : "__UNI__0BBF9A7",
+    "description" : "录音、会议纪要与待办",
+    "versionName" : "0.1.0",
+    "versionCode" : "100",
+    "transformPx" : false,
+    "vueVersion" : "3",
+    "app-plus" : {
+        "usingComponents" : true,
+        "nvueStyleCompiler" : "uni-app",
+        "compilerVersion" : 3,
+        "splashscreen" : {
+            "alwaysShowBeforeRender" : true,
+            "waiting" : true,
+            "autoclose" : true,
+            "delay" : 0
+        },
+        "modules" : {
+            "Audio" : {}
+        },
+        "distribute" : {
+            "android" : {
+                "packagename" : "com.huiyi.meetingdemo",
+                "minSdkVersion" : 23,
+                "targetSdkVersion" : 35,
+                "abiFilters" : [ "arm64-v8a", "armeabi-v7a", "x86_64" ],
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>",
+                    "<uses-permission android:name=\"android.permission.INTERNET\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
+                    "<uses-feature android:name=\"android.hardware.microphone\" android:required=\"false\"/>"
+                ]
+            },
+            "icons" : {
+                "android" : {
+                    "mdpi" : "static/icon-48.png",
+                    "hdpi" : "static/icon-72.png",
+                    "xhdpi" : "static/icon-96.png",
+                    "xxhdpi" : "static/icon-144.png",
+                    "xxxhdpi" : "static/icon-192.png"
+                }
+            },
+            "ios" : {
+                "dSYMs" : false
+            }
+        }
+    },
+    "uniStatistics" : {
+        "enable" : false
+    },
+    "h5" : {
+        "title" : "会议记录",
+        "router" : {
+            "mode" : "hash"
+        }
+    }
+}
