@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>会议数据存储架构</title>
+  <style>
+    :root { color-scheme: light; --ink: #20302d; --muted: #65736e; --line: #dfe6e1; --green: #21634d; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f3f5f1; color: var(--ink); font-family: "Microsoft YaHei", "PingFang SC", sans-serif; font-size: 15px; line-height: 1.8; }
+    main { max-width: 1000px; margin: 40px auto; padding: 48px 56px; background: #fff; border: 1px solid var(--line); border-radius: 18px; }
+    .eyebrow { margin: 0 0 12px; color: var(--green); font-size: 12px; letter-spacing: 2px; font-weight: 700; }
+    h1 { margin: 0; font-size: 34px; line-height: 1.35; letter-spacing: -1px; }
+    .intro { margin: 16px 0 8px; font-size: 18px; }
+    .meta { margin: 0; color: var(--muted); font-size: 13px; }
+    section { margin-top: 34px; }
+    h2 { margin: 0 0 14px; font-size: 19px; }
+    h2 span { margin-right: 10px; color: var(--green); font-size: 13px; }
+    p { margin: 10px 0; }
+    .diagram { padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: #fafbf9; }
+    .flow { display: flex; align-items: center; justify-content: center; gap: 14px; }
+    .node { flex: 1; padding: 14px; text-align: center; background: #fff; border: 1px solid var(--line); border-radius: 9px; }
+    .node strong { display: block; font-size: 16px; }
+    .node small { display: block; color: var(--muted); font-size: 12px; }
+    .node.accent { background: #edf5ef; border-color: #bad3c3; }
+    .future-tag { display: inline-block; margin-top: 9px; padding: 2px 9px; border: 1px dashed #8aac97; border-radius: 6px; color: var(--green); font-size: 12px; }
+    .future-panel { padding: 20px 24px; border: 1px dashed #8aac97; border-radius: 12px; background: #fafcf9; }
+    .future-panel > p:first-child { margin-top: 0; }
+    .future-panel > p:last-child { margin-bottom: 0; }
+    .stores { flex: 1.25; display: grid; gap: 10px; }
+    .arrow { color: var(--green); font-size: 23px; }
+    .caption { margin: 16px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; background: #f3f6f2; font-weight: 600; white-space: nowrap; }
+    th, td { padding: 13px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tr:last-child td { border-bottom: 0; }
+    td:first-child { min-width: 120px; }
+    code { font-family: Consolas, monospace; font-size: .94em; color: var(--green); overflow-wrap: anywhere; }
+    .note { border-left: 3px solid #8aac97; padding: 10px 16px; margin-top: 14px; background: #f6f8f4; font-size: 14px; }
+    .steps { padding-left: 23px; margin: 0; }
+    .steps li { margin: 8px 0; padding-left: 3px; }
+    .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .rule { padding: 17px 20px; border: 1px solid var(--line); border-radius: 10px; }
+    .rule strong { display: block; margin-bottom: 4px; }
+    .rule p { font-size: 14px; color: var(--muted); margin: 0; }
+    footer { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+    @media (max-width: 680px) {
+      main { margin: 12px; padding: 26px 20px; border-radius: 12px; }
+      h1 { font-size: 27px; }
+      .intro { font-size: 16px; }
+      .flow { flex-direction: column; gap: 8px; }
+      .node, .stores { width: 100%; }
+      .arrow { transform: rotate(90deg); line-height: 1; }
+      .rules { grid-template-columns: 1fr; }
+      th, td { padding: 10px 12px; }
+    }
+    @media print {
+      body { background: #fff; font-size: 12px; }
+      main { max-width: none; margin: 0; padding: 0; border: 0; border-radius: 0; }
+      h1 { font-size: 27px; }
+      section { margin-top: 22px; }
+      .diagram, .rule, tr { break-inside: avoid; }
+      h2 { break-after: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">会议记录 · 存储方案</p>
+      <h1>会议数据存储架构</h1>
+      <p class="intro">录音文件存 OSS，会议内容与业务数据存 PostgreSQL。</p>
+      <p class="meta">架构展示稿 v1.1 · 2026-09-14 · 当前方案：PostgreSQL + OSS · 后续扩展：pgvector</p>
+    </header>
+
+    <section aria-labelledby="architecture">
+      <h2 id="architecture"><span>01</span>整体架构</h2>
+      <div class="diagram">
+        <div class="flow" aria-label="App 通过业务后端使用 OSS 和 PostgreSQL">
+          <div class="node"><strong>App</strong><small>录音 · 查看 · 回放</small></div>
+          <div class="arrow" aria-hidden="true">↔</div>
+          <div class="node accent"><strong>业务后端</strong><small>文件上传 · 会议处理 · 数据查询</small></div>
+          <div class="arrow" aria-hidden="true">↔</div>
+          <div class="stores">
+            <div class="node"><strong>OSS</strong><small>录音原文件</small></div>
+            <div class="node"><strong>PostgreSQL</strong><small>录音 URL · 摘要 · 全文 · 待办</small><span class="future-tag">后续可选：pgvector 向量扩展</span></div>
+          </div>
+        </div>
+        <p class="caption">以会议 ID 关联文件与内容，统一提供会议查询和录音回放。</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="storage">
+      <h2 id="storage"><span>02</span>数据存在哪里</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">数据</th><th scope="col">存储方式</th><th scope="col">说明</th></tr></thead>
+          <tbody>
+            <tr><td>录音文件</td><td>OSS + <code>audio_url</code></td><td>文件上传 OSS，数据库保存永久 URL。</td></tr>
+            <tr><td>会议基本信息</td><td>明确类型的字段</td><td>会议 ID、标题、客户、创建时间、时长、处理状态等。</td></tr>
+            <tr><td>会议摘要</td><td><code>TEXT</code></td><td>直接保存正文，便于展示和编辑。</td></tr>
+            <tr><td>转写全文（如需要）</td><td><code>TEXT</code></td><td>30 分钟会议的文本量通常可直接入库，无需仅因时长而文件化。</td></tr>
+            <tr><td>关键事项</td><td><code>JSONB</code></td><td>保存结构灵活的列表或对象，例如客户需求、结论、待确认问题。</td></tr>
+            <tr><td>待办事项</td><td>独立表、独立字段</td><td>内容、负责人、截止时间、完成状态，支持单独查询和更新。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">类型选择：固定业务属性使用明确类型的字段；正文使用 TEXT；结构灵活的内容使用 JSONB。三者都存放在 PostgreSQL 表中。</p>
+    </section>
+
+    <section aria-labelledby="files">
+      <h2 id="files"><span>03</span>文件与配置的分工</h2>
+      <div class="rules">
+        <div class="rule">
+          <strong>会议业务表保存 URL</strong>
+          <p>录音使用永久 URL 关联，不需要在会议表里重复保存 Bucket、域名等存储配置。</p>
+        </div>
+        <div class="rule">
+          <strong>统一维护 OSS 配置</strong>
+          <p>沿用 freshstack-cloud 的文件模块：Bucket、域名、Endpoint 等由文件配置维护；configId、path 由文件记录维护。</p>
+        </div>
+      </div>
+      <p class="note">已有配置位于 <code>infra_file_config</code>，文件记录位于 <code>infra_file</code>。存储配置中的凭据仅由后端使用。</p>
+    </section>
+
+    <section aria-labelledby="workflow">
+      <h2 id="workflow"><span>04</span>基础处理流程</h2>
+      <ol class="steps">
+        <li>录音结束后上传 OSS，将返回的永久 URL 关联到会议记录。</li>
+        <li>后端在后台处理录音，生成摘要、关键事项和待办；有全文需求时增加转写。</li>
+        <li>将处理结果写入 PostgreSQL，更新会议处理状态。</li>
+        <li>App 查询会议内容，使用录音访问地址回放；失败时保留录音，支持重试。</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="extension">
+      <h2 id="extension"><span>05</span>后续扩展：pgvector</h2>
+      <div class="future-panel">
+        <p><strong>在现有 PostgreSQL 中增加语义检索能力。</strong>有跨会议搜索、历史会议问答需求时再接入，无需另建独立向量数据库。</p>
+        <p>例如：搜索“客户认为价格偏高”，可以找到“这个报价超预算了”等语义相关的会议片段，并关联录音时间位置。</p>
+        <ol class="steps">
+          <li><strong>准备数据：</strong>转写全文切成片段，由 embedding 模型生成向量。</li>
+          <li><strong>保存与检索：</strong>PostgreSQL 保存片段、会议 ID、时间位置和向量，pgvector 负责向量相似度检索。</li>
+          <li><strong>返回结果：</strong>展示相关原文和录音位置；需要问答时，再由大模型基于检索结果生成回答。</li>
+        </ol>
+        <p class="note">接入前确认线上 RDS 的 PostgreSQL 版本、可用 vector 扩展及账号权限。向量维度与 embedding 模型保持一致，索引按数据量和性能需求配置。录音仍存 OSS，摘要、全文和待办沿用当前存储方式。</p>
+      </div>
+    </section>
+
+    <footer>
+      本页仅用于架构展示，不连接数据库、OSS 或模型服务。基础方案与 pgvector 扩展均为设计说明，不代表已实施。完整逐字稿的生成能力按后续需求确定。
+    </footer>
+  </main>
+</body>
+</html>
